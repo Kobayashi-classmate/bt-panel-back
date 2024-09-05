@@ -22,7 +22,7 @@ class Admin extends BaseController
         if (request()->islogin) {
             return redirect('/admin');
         }
-        if (request()->isGet()) {
+        // if (request()->isGet()) {
             $username = input('post.username', null, 'trim');
             $password = input('post.password', null, 'trim');
             $code = input('post.code', null, 'trim');
@@ -44,8 +44,8 @@ class Admin extends BaseController
             } else {
                 return json(['code' => -1, 'msg' => '用户名或密码错误']);
             }
-        }
-        return view();
+        // }
+        // return view();
     }
 
     public function logout()
