@@ -56,43 +56,37 @@ class Admin extends BaseController
 
     public function index()
     {
-        if (request()->isGet()) {
-            $stat = ['total' => 0, 'free' => 0, 'pro' => 0, 'ltd' => 0, 'third' => 0];
-            $json_arr = Plugins::get_plugin_list();
-            if ($json_arr) {
-                foreach ($json_arr['list'] as $plugin) {
-                    $stat['total']++;
-                    if ($plugin['type'] == 10)
-                        $stat['third']++;
-                    elseif ($plugin['type'] == 12)
-                        $stat['ltd']++;
-                    elseif ($plugin['type'] == 8)
-                        $stat['pro']++;
-                    elseif ($plugin['type'] == 5 || $plugin['type'] == 6 || $plugin['type'] == 7)
-                        $stat['free']++;
-                }
+        $stat = ['total' => 0, 'free' => 0, 'pro' => 0, 'ltd' => 0, 'third' => 0];
+        $json_arr = Plugins::get_plugin_list();
+        if ($json_arr) {
+            foreach ($json_arr['list'] as $plugin) {
+                $stat['total']++;
+                if ($plugin['type'] == 10)
+                    $stat['third']++;
+                elseif ($plugin['type'] == 12)
+                    $stat['ltd']++;
+                elseif ($plugin['type'] == 8)
+                    $stat['pro']++;
+                elseif ($plugin['type'] == 5 || $plugin['type'] == 6 || $plugin['type'] == 7)
+                    $stat['free']++;
             }
-            $stat['runtime'] = Db::name('config')->where('key', 'runtime')->value('value') ?? '<font color="red">未运行</font>';
-            $stat['record_total'] = Db::name('record')->count();
-            $stat['record_isuse'] = Db::name('record')->whereTime('usetime', '>=', strtotime('-7 days'))->count();
-            // View::assign('stat', $stat);
-
-            $tmp = 'version()';
-            $mysqlVersion = Db::query("select version()")[0][$tmp];
-            $info = [
-                'framework_version' => app()::VERSION,
-                'php_version' => PHP_VERSION,
-                'mysql_version' => $mysqlVersion,
-                'software' => $_SERVER['SERVER_SOFTWARE'],
-                'os' => php_uname(),
-                'date' => date("Y-m-d H:i:s"),
-            ];
-            return json([$stat, $info]);
-        } else {
-            // View::assign('info', $info);
-            return view();
         }
+        $stat['runtime'] = Db::name('config')->where('key', 'runtime')->value('value') ?? '<font color="red">未运行</font>';
+        $stat['record_total'] = Db::name('record')->count();
+        $stat['record_isuse'] = Db::name('record')->whereTime('usetime', '>=', strtotime('-7 days'))->count();
+        // View::assign('stat', $stat);
 
+        $tmp = 'version()';
+        $mysqlVersion = Db::query("select version()")[0][$tmp];
+        $info = [
+            'framework_version' => app()::VERSION,
+            'php_version' => PHP_VERSION,
+            'mysql_version' => $mysqlVersion,
+            'software' => $_SERVER['SERVER_SOFTWARE'],
+            'os' => php_uname(),
+            'date' => date("Y-m-d H:i:s"),
+        ];
+        return json(['stat' => $stat, 'info' => $info]);
     }
 
     public function set()
