@@ -10,11 +10,15 @@ use think\facade\Cache;
 use app\lib\Btapi;
 use app\lib\Plugins;
 
+
+use edward\captcha\facade\CaptchaApi;
 class Admin extends BaseController
 {
     public function verifycode()
     {
-        return captcha();
+        $data = CaptchaApi::create();
+        // return $data;
+        return json(['code' => 200, 'data' => $data]);
     }
 
     public function login()
@@ -22,15 +26,16 @@ class Admin extends BaseController
         if (request()->islogin) {
             return redirect('/admin');
         }
-        // if (request()->isGet()) {
+        if (request()->isAjax()) {
             $username = input('post.username', null, 'trim');
             $password = input('post.password', null, 'trim');
             $code = input('post.code', null, 'trim');
+            $key = input('post.key', null, 'trim');
 
             if (empty($username) || empty($password)) {
                 return json(['code' => -1, 'msg' => '用户名或密码不能为空']);
             }
-            if (!captcha_check($code)) {
+            if (!CaptchaApi::check($code,$key)) {
                 return json(['code' => -1, 'msg' => '验证码错误']);
             }
             if ($username == config_get('admin_username') && $password == config_get('admin_password')) {
@@ -40,12 +45,11 @@ class Admin extends BaseController
                 $token = authcode("{$username}\t{$session}\t{$expiretime}", 'ENCODE', config_get('syskey'));
                 cookie('admin_token', $token, ['expire' => $expiretime, 'httponly' => true]);
                 config_set('admin_lastlogin', date('Y-m-d H:i:s'));
-                return json(['code' => 0]);
+                return json(['code' => 200, 'data' => ['admin_token' => $token]]);
             } else {
                 return json(['code' => -1, 'msg' => '用户名或密码错误']);
             }
-        // }
-        // return view();
+        }
     }
 
     public function logout()

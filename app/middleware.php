@@ -8,5 +8,7 @@ return [
     // Session初始化
     // \think\middleware\SessionInit::class,
     \app\middleware\LoadConfig::class,
-    \app\middleware\AuthAdmin::class
+    \app\middleware\AuthAdmin::class,
+    //允许跨域
+    \app\middleware\AllowCrossDomain::class
 ];
