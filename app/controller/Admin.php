@@ -17,7 +17,7 @@ class Admin extends BaseController
     public function verifycode()
     {
         $data = CaptchaApi::create();
-        // return $data;
+        unset($data['code']);
         return json(['code' => 200, 'data' => $data]);
     }
 
@@ -45,9 +45,9 @@ class Admin extends BaseController
                 $token = authcode("{$username}\t{$session}\t{$expiretime}", 'ENCODE', config_get('syskey'));
                 cookie('admin_token', $token, ['expire' => $expiretime, 'httponly' => true]);
                 config_set('admin_lastlogin', date('Y-m-d H:i:s'));
-                return json(['code' => 200, 'data' => ['admin_token' => $token]]);
+                return json(['code' => 200, 'data' => ['admin_token' => $token], 'success' => "true"]);
             } else {
-                return json(['code' => -1, 'msg' => '用户名或密码错误']);
+                return json(['code' => -1, 'msg' => '用户名或密码错误', 'success' => "false"]);
             }
         }
     }
