@@ -152,7 +152,7 @@ Route::group('admin', function () {
     Route::get('/cleancache', 'admin/cleancache');
     Route::any('/ssl', 'admin/ssl');
 
-});
+})->middleware(thans\jwt\middleware\JWTAuth::class);
 
 Route::any('/installapp', 'install/index');
 

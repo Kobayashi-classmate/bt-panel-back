@@ -1,11 +1,12 @@
 <?php
-declare (strict_types = 1);
+declare(strict_types=1);
 
 namespace app\middleware;
 
 use think\facade\Db;
 use think\facade\Config;
 use think\facade\View;
+use think\Response;
 
 class LoadConfig
 {
@@ -18,18 +19,18 @@ class LoadConfig
      */
     public function handle($request, \Closure $next)
     {
-        if (!file_exists(app()->getRootPath().'.env')){
-            if(strpos(request()->url(),'/installapp')===false){
-                return redirect((string)url('/installapp'))->header([
+        if (!file_exists(app()->getRootPath() . '.env')) {
+            if (strpos(request()->url(), '/installapp') === false) {
+                return redirect((string) url('/installapp'))->header([
                     'Cache-Control' => 'no-store, no-cache, must-revalidate',
                     'Pragma' => 'no-cache',
                 ]);
-            }else{
+            } else {
                 return $next($request);
             }
         }
 
-        $res = Db::name('config')->cache('configs',0)->column('value','key');
+        $res = Db::name('config')->cache('configs', 0)->column('value', 'key');
         Config::set($res, 'sys');
 
         View::assign('cdnpublic', '//lf6-cdn-tos.bytecdntp.com/cdn/expire-1-M/');
