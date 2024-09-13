@@ -131,7 +131,7 @@ Route::any('/admin/login', 'admin/login')->middleware(\think\middleware\SessionI
 Route::get('/admin/logout', 'admin/logout');
 
 Route::group('admin', function () {
-    Route::get('/', 'admin/index');
+    Route::get('/statistics', 'admin/statistics');
     Route::any('/set', 'admin/set');
     Route::post('/setaccount', 'admin/setaccount');
     Route::post('/testbturl', 'admin/testbturl');

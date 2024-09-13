@@ -58,7 +58,7 @@ class Admin extends BaseController
         return redirect('/admin/login');
     }
 
-    public function index()
+    public function statistics()
     {
         $stat = ['total' => 0, 'free' => 0, 'pro' => 0, 'ltd' => 0, 'third' => 0];
         $json_arr = Plugins::get_plugin_list();
@@ -75,7 +75,12 @@ class Admin extends BaseController
                     $stat['free']++;
             }
         }
-        $stat['runtime'] = Db::name('config')->where('key', 'runtime')->value('value') ?? '<font color="red">未运行</font>';
+        if (!Db::name('config')->where('key', 'runtime')->value('value')) {
+            $stat['runyn'] = false;
+        }else {
+            $stat['runyn'] = true;
+            $stat['runtime'] = Db::name('config')->where('key', 'runtime')->value('value');            
+        }
         $stat['record_total'] = Db::name('record')->count();
         $stat['record_isuse'] = Db::name('record')->whereTime('usetime', '>=', strtotime('-7 days'))->count();
         // View::assign('stat', $stat);
