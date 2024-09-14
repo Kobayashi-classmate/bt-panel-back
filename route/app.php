@@ -129,6 +129,7 @@ Route::group('api', function () {
 Route::get('/admin/verifycode', 'admin/verifycode')->middleware(\think\middleware\SessionInit::class);
 Route::any('/admin/login', 'admin/login')->middleware(\think\middleware\SessionInit::class);
 Route::get('/admin/logout', 'admin/logout');
+Route::post('/admin/refresh_token', 'admin/refretoken');
 
 Route::group('admin', function () {
     Route::get('/statistics', 'admin/statistics');
@@ -151,7 +152,6 @@ Route::group('admin', function () {
     Route::get('/refresh_deplist', 'admin/refresh_deplist');
     Route::get('/cleancache', 'admin/cleancache');
     Route::any('/ssl', 'admin/ssl');
-
 })->middleware(thans\jwt\middleware\JWTAuth::class);
 
 Route::any('/installapp', 'install/index');

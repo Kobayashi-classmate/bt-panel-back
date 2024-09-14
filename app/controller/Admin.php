@@ -9,6 +9,7 @@ use think\facade\Request;
 use think\facade\Cache;
 use app\lib\Btapi;
 use app\lib\Plugins;
+use thans\jwt\facade\JWTAuth;
 
 
 use edward\captcha\facade\CaptchaApi;
@@ -35,27 +36,59 @@ class Admin extends BaseController
             if (empty($username) || empty($password)) {
                 return json(['code' => -1, 'msg' => '用户名或密码不能为空']);
             }
-            if (!CaptchaApi::check($code,$key)) {
+            if (!CaptchaApi::check($code, $key)) {
                 return json(['code' => -1, 'msg' => '验证码错误']);
             }
             if ($username == config_get('admin_username') && $password == config_get('admin_password')) {
                 Db::name('log')->insert(['uid' => 0, 'action' => '登录后台', 'data' => 'IP:' . $this->clientip, 'addtime' => date("Y-m-d H:i:s")]);
-                $session = md5($username . config_get('admin_password'));
-                $expiretime = time() + 2562000;
-                $token = authcode("{$username}\t{$session}\t{$expiretime}", 'ENCODE', config_get('syskey'));
-                cookie('admin_token', $token, ['expire' => $expiretime, 'httponly' => true]);
+                // $expiretime = time() + 2562000;
+                $current_key = Db::name('config')->where('key', 'current_token')->value('value');
+                $refresh_key = Db::name('config')->where('key', 'refresh_token')->value('value');
+                $accesstoken = JWTAuth::builder(['key' => $current_key]);
+                $refreshtoken = JWTAuth::builder(['key' => $refresh_key]);
                 config_set('admin_lastlogin', date('Y-m-d H:i:s'));
-                return json(['code' => 200, 'data' => ['admin_token' => $token], 'success' => "true"]);
+                // Current request time
+                $current_time = date('Y-m-d H:i:s');
+                // token validity period
+                $addtime = strtotime("+40 seconds", strtotime($current_time));
+                // token expiration time
+                $new_time = date('Y-m-d H:i:s', $addtime);
+                return json(['code' => 200, 'data' => ['accessToken' => $accesstoken, 'refreshToken' => $refreshtoken, 'expires' => $new_time], 'success' => "true"]);
             } else {
                 return json(['code' => -1, 'msg' => '用户名或密码错误', 'success' => "false"]);
             }
         }
     }
 
+    public function refretoken()
+    {
+        if (request()->isPost()) {
+            $current_key = Db::name('config')->where('key', 'current_token')->value('value');
+            $refresh_key = Db::name('config')->where('key', 'refresh_token')->value('value');
+            $access_token = input('post.accessToken', null, 'trim');
+            $refresh_payload = JWTAuth::refreshauth();
+            $refresh_token_key = $refresh_payload['key'];
+            if($refresh_key != $refresh_token_key){                
+                return json(['code' => -1, 'success' => "false"]);
+            }
+            JWTAuth::refresh();
+            JWTAuth::invalidate($access_token);
+            $accesstoken = JWTAuth::builder(['key' => $current_key]);
+            // Current request time
+            $current_time = date('Y-m-d H:i:s');
+            // token validity period
+            $addtime = strtotime("+40 seconds", strtotime($current_time));
+            // token expiration time
+            $new_time = date('Y-m-d H:i:s', $addtime);
+            return json(['code' => 200, 'data' => ['accessToken' => $accesstoken, 'expires' => $new_time], 'success' => "true"]);
+        }
+    }
+
     public function logout()
     {
-        cookie('admin_token', null);
+        cookie('accessToken', null);
         return redirect('/admin/login');
+        
     }
 
     public function statistics()
@@ -79,7 +112,7 @@ class Admin extends BaseController
             $stat['runyn'] = false;
         }else {
             $stat['runyn'] = true;
-            $stat['runtime'] = Db::name('config')->where('key', 'runtime')->value('value');            
+            $stat['runtime'] = Db::name('config')->where('key', 'runtime')->value('value');
         }
         $stat['record_total'] = Db::name('record')->count();
         $stat['record_isuse'] = Db::name('record')->whereTime('usetime', '>=', strtotime('-7 days'))->count();
@@ -107,7 +140,7 @@ class Admin extends BaseController
                 config_set($key, $value);
             }
             cache('configs', NULL);
-            return json(['code' => 0]);
+            return json(['code' => 200]);
         }
         $mod = input('param.mod', 'sys');
         View::assign('mod', $mod);
@@ -144,8 +177,8 @@ class Admin extends BaseController
             config_set('admin_password', $params['newpwd']);
         }
         cache('configs', NULL);
-        cookie('admin_token', null);
-        return json(['code' => 0]);
+        cookie('accessToken', null);
+        return json(['code' => 200]);
     }
 
     public function testbturl()
@@ -158,7 +191,7 @@ class Admin extends BaseController
                 return json(['code' => -1, 'msg' => '参数不能为空']);
             $res = get_curl($bt_surl . 'api/SetupCount');
             if (strpos($res, 'ok') !== false) {
-                return json(['code' => 0, 'msg' => '第三方云端连接测试成功！']);
+                return json(['code' => 200, 'msg' => '第三方云端连接测试成功！']);
             } else {
                 return json(['code' => -1, 'msg' => '第三方云端连接测试失败']);
             }
@@ -172,7 +205,7 @@ class Admin extends BaseController
             if ($result && isset($result['status']) && ($result['status'] == 1 || isset($result['sites_path']))) {
                 $result = $btapi->get_user_info();
                 if ($result && isset($result['username'])) {
-                    return json(['code' => 0, 'msg' => '面板连接测试成功！']);
+                    return json(['code' => 200, 'msg' => '面板连接测试成功！']);
                 } else {
                     return json(['code' => -1, 'msg' => '面板连接测试成功，但未安装专用插件']);
                 }
@@ -281,7 +314,7 @@ class Admin extends BaseController
         try {
             Plugins::download_plugin($name, $version, $os);
             Db::name('log')->insert(['uid' => 0, 'action' => '下载插件', 'data' => $name . '-' . $version . ' os:' . $os, 'addtime' => date("Y-m-d H:i:s")]);
-            return json(['code' => 0, 'msg' => '下载成功']);
+            return json(['code' => 200, 'msg' => '下载成功']);
         } catch (\Exception $e) {
             return json(['code' => -1, 'msg' => $e->getMessage()]);
         }
@@ -295,7 +328,7 @@ class Admin extends BaseController
         try {
             Plugins::refresh_plugin_list($os);
             Db::name('log')->insert(['uid' => 0, 'action' => '刷新插件列表', 'data' => '刷新' . $os . '插件列表成功', 'addtime' => date("Y-m-d H:i:s")]);
-            return json(['code' => 0, 'msg' => '获取最新插件列表成功！']);
+            return json(['code' => 200, 'msg' => '获取最新插件列表成功！']);
         } catch (\Exception $e) {
             return json(['code' => -1, 'msg' => $e->getMessage()]);
         }
@@ -379,7 +412,7 @@ class Admin extends BaseController
             if (!$id)
                 return json(['code' => -1, 'msg' => 'no id']);
             $data = Db::name($tablename)->where('id', $id)->find();
-            return json(['code' => 0, 'data' => $data]);
+            return json(['code' => 200, 'data' => $data]);
         } elseif ($act == 'add') {
             $ip = input('post.ip', null, 'trim');
             if (!$ip)
@@ -392,7 +425,7 @@ class Admin extends BaseController
                 'enable' => 1,
                 'addtime' => date("Y-m-d H:i:s")
             ]);
-            return json(['code' => 0, 'msg' => 'succ']);
+            return json(['code' => 200, 'msg' => 'succ']);
         } elseif ($act == 'edit') {
             $id = input('post.id/d');
             $ip = input('post.ip', null, 'trim');
@@ -404,7 +437,7 @@ class Admin extends BaseController
             Db::name($tablename)->where('id', $id)->update([
                 'ip' => $ip
             ]);
-            return json(['code' => 0, 'msg' => 'succ']);
+            return json(['code' => 200, 'msg' => 'succ']);
         } elseif ($act == 'enable') {
             $id = input('post.id/d');
             $enable = input('post.enable/d');
@@ -413,13 +446,13 @@ class Admin extends BaseController
             Db::name($tablename)->where('id', $id)->update([
                 'enable' => $enable
             ]);
-            return json(['code' => 0, 'msg' => 'succ']);
+            return json(['code' => 200, 'msg' => 'succ']);
         } elseif ($act == 'del') {
             $id = input('post.id/d');
             if (!$id)
                 return json(['code' => -1, 'msg' => 'no id']);
             Db::name($tablename)->where('id', $id)->delete();
-            return json(['code' => 0, 'msg' => 'succ']);
+            return json(['code' => 200, 'msg' => 'succ']);
         }
         return json(['code' => -1, 'msg' => 'no act']);
     }
@@ -443,7 +476,7 @@ class Admin extends BaseController
         try {
             Plugins::refresh_deplist($os);
             Db::name('log')->insert(['uid' => 0, 'action' => '刷新一键部署列表', 'data' => '刷新' . $os . '一键部署列表成功', 'addtime' => date("Y-m-d H:i:s")]);
-            return json(['code' => 0, 'msg' => '获取最新一键部署列表成功！']);
+            return json(['code' => 200, 'msg' => '获取最新一键部署列表成功！']);
         } catch (\Exception $e) {
             return json(['code' => -1, 'msg' => $e->getMessage()]);
         }
@@ -452,7 +485,7 @@ class Admin extends BaseController
     public function cleancache()
     {
         Cache::clear();
-        return json(['code' => 0, 'msg' => 'succ']);
+        return json(['code' => 200, 'msg' => 'succ']);
     }
 
     public function ssl()
@@ -482,7 +515,7 @@ class Admin extends BaseController
             if (!$result) {
                 return json(['code' => -1, 'msg' => '生成证书失败']);
             }
-            return json(['code' => 0, 'msg' => '生成证书成功', 'cert' => $result['cert'], 'key' => $result['key']]);
+            return json(['code' => 200, 'msg' => '生成证书成功', 'cert' => $result['cert'], 'key' => $result['key']]);
         }
 
         $dir = app()->getBasePath() . 'script/';
