@@ -34,10 +34,10 @@ class Admin extends BaseController
             $key = input('post.key', null, 'trim');
 
             if (empty($username) || empty($password)) {
-                return json(['code' => -1, 'msg' => '用户名或密码不能为空']);
+                return json(['code' => -1, 'codeimg' => true, 'success' => false]);
             }
             if (!CaptchaApi::check($code, $key)) {
-                return json(['code' => -1, 'msg' => '验证码错误']);
+                return json(['code' => -1, 'codeimg' => false, 'success' => false]);
             }
             if ($username == config_get('admin_username') && $password == config_get('admin_password')) {
                 Db::name('log')->insert(['uid' => 0, 'action' => '登录后台', 'data' => 'IP:' . $this->clientip, 'addtime' => date("Y-m-d H:i:s")]);
@@ -53,9 +53,9 @@ class Admin extends BaseController
                 $addtime = strtotime("+40 seconds", strtotime($current_time));
                 // token expiration time
                 $new_time = date('Y-m-d H:i:s', $addtime);
-                return json(['code' => 200, 'data' => ['accessToken' => $accesstoken, 'refreshToken' => $refreshtoken, 'expires' => $new_time], 'success' => "true"]);
+                return json(['code' => 200, 'data' => ['accessToken' => $accesstoken, 'refreshToken' => $refreshtoken, 'expires' => $new_time], 'success' => true]);
             } else {
-                return json(['code' => -1, 'msg' => '用户名或密码错误', 'success' => "false"]);
+                return json(['code' => -1, 'codeimg' => true, 'success' => false]);
             }
         }
     }
@@ -63,9 +63,13 @@ class Admin extends BaseController
     public function refretoken()
     {
         if (request()->isPost()) {
+            $access_token = input('post.accessToken', null, 'trim');
+            $refresh_token = input('post.token', null, 'trim');
+            if (empty($access_token) || empty($refresh_token)) {
+                return json(['code' => -1, 'success' => false]);
+            }
             $current_key = Db::name('config')->where('key', 'current_token')->value('value');
             $refresh_key = Db::name('config')->where('key', 'refresh_token')->value('value');
-            $access_token = input('post.accessToken', null, 'trim');
             $refresh_payload = JWTAuth::refreshauth();
             $refresh_token_key = $refresh_payload['key'];
             if($refresh_key != $refresh_token_key){                
@@ -80,7 +84,7 @@ class Admin extends BaseController
             $addtime = strtotime("+40 seconds", strtotime($current_time));
             // token expiration time
             $new_time = date('Y-m-d H:i:s', $addtime);
-            return json(['code' => 200, 'data' => ['accessToken' => $accesstoken, 'expires' => $new_time], 'success' => "true"]);
+            return json(['code' => 200, 'data' => ['accessToken' => $accesstoken, 'refreshToken' => $refresh_token, 'expires' => $new_time], 'success' => "true"]);
         }
     }
 
@@ -163,16 +167,16 @@ class Admin extends BaseController
             $params['newpwd2'] = trim($params['newpwd2']);
 
         if (empty($params['username']))
-            return json(['code' => -1, 'msg' => '用户名不能为空']);
+            return json(['code' => -1, 'message' => '用户名不能为空']);
 
         config_set('admin_username', $params['username']);
 
         if (!empty($params['oldpwd']) && !empty($params['newpwd']) && !empty($params['newpwd2'])) {
             if (config_get('admin_password') != $params['oldpwd']) {
-                return json(['code' => -1, 'msg' => '旧密码不正确']);
+                return json(['code' => -1, 'message' => '旧密码不正确']);
             }
             if ($params['newpwd'] != $params['newpwd2']) {
-                return json(['code' => -1, 'msg' => '两次新密码输入不一致']);
+                return json(['code' => -1, 'message' => '两次新密码输入不一致']);
             }
             config_set('admin_password', $params['newpwd']);
         }
@@ -188,29 +192,29 @@ class Admin extends BaseController
         if ($bt_type == 1) {
             $bt_surl = input('post.bt_surl');
             if (!$bt_surl)
-                return json(['code' => -1, 'msg' => '参数不能为空']);
+                return json(['code' => -1, 'message' => '参数不能为空']);
             $res = get_curl($bt_surl . 'api/SetupCount');
             if (strpos($res, 'ok') !== false) {
-                return json(['code' => 200, 'msg' => '第三方云端连接测试成功！']);
+                return json(['code' => 200, 'message' => '第三方云端连接测试成功！']);
             } else {
-                return json(['code' => -1, 'msg' => '第三方云端连接测试失败']);
+                return json(['code' => -1, 'message' => '第三方云端连接测试失败']);
             }
         } else {
             $bt_url = input('post.bt_url');
             $bt_key = input('post.bt_key');
             if (!$bt_url || !$bt_key)
-                return json(['code' => -1, 'msg' => '参数不能为空']);
+                return json(['code' => -1, 'message' => '参数不能为空']);
             $btapi = new Btapi($bt_url, $bt_key);
             $result = $btapi->get_config();
             if ($result && isset($result['status']) && ($result['status'] == 1 || isset($result['sites_path']))) {
                 $result = $btapi->get_user_info();
                 if ($result && isset($result['username'])) {
-                    return json(['code' => 200, 'msg' => '面板连接测试成功！']);
+                    return json(['code' => 200, 'message' => '面板连接测试成功！']);
                 } else {
-                    return json(['code' => -1, 'msg' => '面板连接测试成功，但未安装专用插件']);
+                    return json(['code' => -1, 'message' => '面板连接测试成功，但未安装专用插件']);
                 }
             } else {
-                return json(['code' => -1, 'msg' => isset($result['msg']) ? $result['msg'] : '面板地址无法连接']);
+                return json(['code' => -1, 'message' => isset($result['message']) ? $result['message'] : '面板地址无法连接']);
             }
         }
     }
@@ -310,13 +314,13 @@ class Admin extends BaseController
         if (!$os)
             $os = 'Linux';
         if (!$name || !$version)
-            return json(['code' => -1, 'msg' => '参数不能为空']);
+            return json(['code' => -1, 'message' => '参数不能为空']);
         try {
             Plugins::download_plugin($name, $version, $os);
             Db::name('log')->insert(['uid' => 0, 'action' => '下载插件', 'data' => $name . '-' . $version . ' os:' . $os, 'addtime' => date("Y-m-d H:i:s")]);
-            return json(['code' => 200, 'msg' => '下载成功']);
+            return json(['code' => 200, 'message' => '下载成功']);
         } catch (\Exception $e) {
-            return json(['code' => -1, 'msg' => $e->getMessage()]);
+            return json(['code' => -1, 'message' => $e->getMessage()]);
         }
     }
 
@@ -328,9 +332,9 @@ class Admin extends BaseController
         try {
             Plugins::refresh_plugin_list($os);
             Db::name('log')->insert(['uid' => 0, 'action' => '刷新插件列表', 'data' => '刷新' . $os . '插件列表成功', 'addtime' => date("Y-m-d H:i:s")]);
-            return json(['code' => 200, 'msg' => '获取最新插件列表成功！']);
+            return json(['code' => 200, 'message' => '获取最新插件列表成功！']);
         } catch (\Exception $e) {
-            return json(['code' => -1, 'msg' => $e->getMessage()]);
+            return json(['code' => -1, 'message' => $e->getMessage()]);
         }
     }
 
@@ -410,51 +414,51 @@ class Admin extends BaseController
         if ($act == 'get') {
             $id = input('post.id/d');
             if (!$id)
-                return json(['code' => -1, 'msg' => 'no id']);
+                return json(['code' => -1, 'message' => 'no id']);
             $data = Db::name($tablename)->where('id', $id)->find();
             return json(['code' => 200, 'data' => $data]);
         } elseif ($act == 'add') {
             $ip = input('post.ip', null, 'trim');
             if (!$ip)
-                return json(['code' => -1, 'msg' => 'IP不能为空']);
+                return json(['code' => -1, 'message' => 'IP不能为空']);
             if (Db::name($tablename)->where('ip', $ip)->find()) {
-                return json(['code' => -1, 'msg' => '该IP已存在']);
+                return json(['code' => -1, 'message' => '该IP已存在']);
             }
             Db::name($tablename)->insert([
                 'ip' => $ip,
                 'enable' => 1,
                 'addtime' => date("Y-m-d H:i:s")
             ]);
-            return json(['code' => 200, 'msg' => 'succ']);
+            return json(['code' => 200, 'message' => 'succ']);
         } elseif ($act == 'edit') {
             $id = input('post.id/d');
             $ip = input('post.ip', null, 'trim');
             if (!$id || !$ip)
-                return json(['code' => -1, 'msg' => 'IP不能为空']);
+                return json(['code' => -1, 'message' => 'IP不能为空']);
             if (Db::name($tablename)->where('ip', $ip)->where('id', '<>', $id)->find()) {
-                return json(['code' => -1, 'msg' => '该IP已存在']);
+                return json(['code' => -1, 'message' => '该IP已存在']);
             }
             Db::name($tablename)->where('id', $id)->update([
                 'ip' => $ip
             ]);
-            return json(['code' => 200, 'msg' => 'succ']);
+            return json(['code' => 200, 'message' => 'succ']);
         } elseif ($act == 'enable') {
             $id = input('post.id/d');
             $enable = input('post.enable/d');
             if (!$id)
-                return json(['code' => -1, 'msg' => 'no id']);
+                return json(['code' => -1, 'message' => 'no id']);
             Db::name($tablename)->where('id', $id)->update([
                 'enable' => $enable
             ]);
-            return json(['code' => 200, 'msg' => 'succ']);
+            return json(['code' => 200, 'message' => 'succ']);
         } elseif ($act == 'del') {
             $id = input('post.id/d');
             if (!$id)
-                return json(['code' => -1, 'msg' => 'no id']);
+                return json(['code' => -1, 'message' => 'no id']);
             Db::name($tablename)->where('id', $id)->delete();
-            return json(['code' => 200, 'msg' => 'succ']);
+            return json(['code' => 200, 'message' => 'succ']);
         }
-        return json(['code' => -1, 'msg' => 'no act']);
+        return json(['code' => -1, 'message' => 'no act']);
     }
 
     public function deplist()
@@ -476,16 +480,16 @@ class Admin extends BaseController
         try {
             Plugins::refresh_deplist($os);
             Db::name('log')->insert(['uid' => 0, 'action' => '刷新一键部署列表', 'data' => '刷新' . $os . '一键部署列表成功', 'addtime' => date("Y-m-d H:i:s")]);
-            return json(['code' => 200, 'msg' => '获取最新一键部署列表成功！']);
+            return json(['code' => 200, 'message' => '获取最新一键部署列表成功！']);
         } catch (\Exception $e) {
-            return json(['code' => -1, 'msg' => $e->getMessage()]);
+            return json(['code' => -1, 'message' => $e->getMessage()]);
         }
     }
 
     public function cleancache()
     {
         Cache::clear();
-        return json(['code' => 200, 'msg' => 'succ']);
+        return json(['code' => 200, 'message' => 'succ']);
     }
 
     public function ssl()
@@ -495,7 +499,7 @@ class Admin extends BaseController
             $common_name = input('post.common_name', null, 'trim');
             $validity = input('post.validity/d');
             if (empty($domain_list) || empty($validity)) {
-                return json(['code' => -1, 'msg' => '参数不能为空']);
+                return json(['code' => -1, 'message' => '参数不能为空']);
             }
             $array = explode("\n", $domain_list);
             $domain_list = [];
@@ -504,18 +508,18 @@ class Admin extends BaseController
                 if (empty($domain))
                     continue;
                 if (!checkDomain($domain))
-                    return json(['code' => -1, 'msg' => '域名或IP格式不正确:' . $domain]);
+                    return json(['code' => -1, 'message' => '域名或IP格式不正确:' . $domain]);
                 $domain_list[] = $domain;
             }
             if (empty($domain_list))
-                return json(['code' => -1, 'msg' => '域名列表不能为空']);
+                return json(['code' => -1, 'message' => '域名列表不能为空']);
             if (empty($common_name))
                 $common_name = $domain_list[0];
             $result = makeSelfSignSSL($common_name, $domain_list, $validity);
             if (!$result) {
-                return json(['code' => -1, 'msg' => '生成证书失败']);
+                return json(['code' => -1, 'message' => '生成证书失败']);
             }
-            return json(['code' => 200, 'msg' => '生成证书成功', 'cert' => $result['cert'], 'key' => $result['key']]);
+            return json(['code' => 200, 'message' => '生成证书成功', 'cert' => $result['cert'], 'key' => $result['key']]);
         }
 
         $dir = app()->getBasePath() . 'script/';
